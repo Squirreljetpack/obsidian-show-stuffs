@@ -1,6 +1,7 @@
 import { lstat, readdir } from "fs/promises";
 import type { Dirent } from "fs";
-import { Plugin, PluginSettingTab, Setting, App } from "obsidian";
+import { Plugin, PluginSettingTab, Setting, App, TFile, MarkdownPostProcessorContext } from "obsidian";
+import { EditorView, ViewUpdate, ViewPlugin, PluginValue } from "@codemirror/view";
 import picomatch from "picomatch";
 
 /* ── Type augmentations for internal Obsidian APIs ─────────── */
@@ -90,13 +91,37 @@ interface ShowHiddenFilesSettings {
 	showAllFileTypes: boolean;
 	showHiddenFiles: boolean;
 	ignoredHiddenGlobs: string;
+	renderHtmlImages: boolean;
 }
 
 const DEFAULT_SETTINGS: ShowHiddenFilesSettings = {
-	showAllFileTypes: true,
-	showHiddenFiles: true,
+	showAllFileTypes: false,
+	showHiddenFiles: false,
 	ignoredHiddenGlobs: "",
+	renderHtmlImages: false,
 };
+
+/* ── Live Preview Plugin ────────────────────────────────────── */
+
+class HtmlImagePluginValue implements PluginValue {
+	constructor(private view: EditorView, private plugin: ShowHiddenFilesPlugin) {
+		this.updateImages();
+	}
+
+	update(update: ViewUpdate) {
+		if (update.docChanged) {
+			this.updateImages();
+		}
+	}
+
+	private updateImages() {
+		if (!this.plugin.settings.renderHtmlImages) return;
+		const activeFile = this.plugin.app.workspace.getActiveFile();
+		if (activeFile) {
+			this.plugin.processHtmlImages(this.view.dom, activeFile.path);
+		}
+	}
+}
 
 /* ── Plugin ────────────────────────────────────────────────── */
 
@@ -118,7 +143,9 @@ export default class ShowHiddenFilesPlugin extends Plugin {
 			(this.app.vault.getConfig("showUnsupportedFiles") as boolean) ??
 			false;
 
-		this.applyShowAllFileTypes();
+		if (this.settings.showAllFileTypes) {
+			this.applyShowAllFileTypes();
+		}
 
 		this.app.workspace.onLayoutReady(async () => {
 			this.updateMatcher();
@@ -128,6 +155,16 @@ export default class ShowHiddenFilesPlugin extends Plugin {
 				await this.refreshHiddenFiles();
 			}
 		});
+
+		this.registerMarkdownPostProcessor((element: HTMLElement, context: MarkdownPostProcessorContext) => {
+			if (this.settings.renderHtmlImages) {
+				this.processHtmlImages(element, context.sourcePath);
+			}
+		});
+
+		this.registerEditorExtension(
+			ViewPlugin.define((view) => new HtmlImagePluginValue(view, this))
+		);
 
 		this.addSettingTab(new ShowHiddenFilesSettingTab(this.app, this));
 	}
@@ -140,6 +177,32 @@ export default class ShowHiddenFilesPlugin extends Plugin {
 			"showUnsupportedFiles",
 			this.previousShowUnsupportedFiles,
 		);
+	}
+
+	/* ── html image rendering ──────────────────────────────── */
+
+	/**
+	 * Logic inspired by lcl-obsidian-html-local-img-plugin
+	 * @see https://github.com/csdjk/lcl-obsidian-html-local-img-plugin
+	 */
+	processHtmlImages(element: HTMLElement, sourcePath: string) {
+		const targetLinks = Array.from(element.getElementsByTagName("img"));
+		for (const link of targetLinks) {
+			if (!link.src || link.src.startsWith("http") || link.src.startsWith("data:")) {
+				continue;
+			}
+
+			// Obsidian internal protocol cleaning
+			const cleanLink = link.src
+				.replace("app://obsidian.md/", "")
+				.replace("capacitor://localhost/", "");
+
+			const imageFile = this.app.metadataCache.getFirstLinkpathDest(decodeURIComponent(cleanLink), sourcePath);
+			if (imageFile instanceof TFile) {
+				const activePath = this.app.vault.getResourcePath(imageFile);
+				link.src = activePath;
+			}
+		}
 	}
 
 	/* ── settings persistence ──────────────────────────────── */
@@ -425,11 +488,7 @@ class ShowHiddenFilesSettingTab extends PluginSettingTab {
 					'Synced with Obsidian\'s native "Detect all file extensions" setting.',
 			)
 			.addToggle((toggle) => {
-				const current =
-					(this.app.vault.getConfig(
-						"showUnsupportedFiles",
-					) as boolean) ?? false;
-				toggle.setValue(current).onChange(async (value) => {
+				toggle.setValue(this.plugin.settings.showAllFileTypes).onChange(async (value) => {
 					this.plugin.settings.showAllFileTypes = value;
 					await this.plugin.saveSettings();
 					this.plugin.applyShowAllFileTypes();
@@ -473,5 +532,23 @@ class ShowHiddenFilesSettingTab extends PluginSettingTab {
 					});
 				text.inputEl.rows = 6;
 			});
+
+		containerEl.createEl("h3", { text: "Experimental" });
+
+		new Setting(containerEl)
+			.setName("Render local HTML images")
+			.setDesc(
+				"Attempt to resolve and display local images used in HTML <img> tags. Useful for viewing images in hidden folders or non-standard paths.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.renderHtmlImages)
+					.onChange(async (value) => {
+						this.plugin.settings.renderHtmlImages = value;
+						await this.plugin.saveSettings();
+						// Refresh active view if possible
+						this.app.workspace.requestSaveLayout();
+					})
+			);
 	}
 }
