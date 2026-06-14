@@ -58,13 +58,19 @@ class ExclusionMatcher {
 	constructor(globs: string[]) {
 		// Transform globs to handle both exact matches and child paths
 		const transformedGlobs = globs.flatMap((glob) => {
-			const normalized = glob.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-			if (!normalized) return [];
+			let pattern = glob.replace(/\\/g, "/").trim();
+			if (!pattern) return [];
 
-			const hasSeparator = normalized.includes("/");
-			const isMatchAnywhere = !hasSeparator && !normalized.startsWith("**/");
+			// .gitignore logic: anchored if starts with / or has / in the middle
+			// (excluding a trailing / which just indicates it's a directory)
+			const isAnchored =
+				pattern.startsWith("/") || pattern.slice(0, -1).includes("/");
 
-			const base = isMatchAnywhere ? `**/${normalized}` : normalized;
+			// Remove leading/trailing slashes for picomatch consistency
+			pattern = pattern.replace(/^\/+|\/+$/g, "");
+			if (!pattern) return [];
+
+			const base = isAnchored ? pattern : `**/${pattern}`;
 			// Match the path itself and any children
 			return [base, `${base}/**`];
 		});
