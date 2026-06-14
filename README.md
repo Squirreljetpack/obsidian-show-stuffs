@@ -14,7 +14,7 @@ The display toggles are **enabled by default** when the plugin is activated and 
 
 ## Installation
 
-### From Community Plugins (recommended)
+### From Community Plugins (not available)
 
 1. Open **Settings → Community plugins → Browse**
 2. Search for **Show Hidden Files**

@@ -58,13 +58,17 @@ class ExclusionMatcher {
 	constructor(globs: string[]) {
 		// Transform globs to handle both exact matches and child paths
 		const transformedGlobs = globs.flatMap((glob) => {
-			const normalized = glob.replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
-			if (!normalized) return [];
-
-			const hasSeparator = normalized.includes("/");
-			const isMatchAnywhere = !hasSeparator && !normalized.startsWith("**/");
-
-			const base = isMatchAnywhere ? `**/${normalized}` : normalized;
+			const isAnchored =
+			  glob.startsWith("/") ||
+			  glob.startsWith("\\") ||
+			  glob.slice(0, -1).includes("/") ||
+			  glob.slice(0, -1).includes("\\");
+			  
+			// "support" windows style paths
+			let pattern = normalizeVaultPath(glob).trim();
+			if (!pattern) return [];
+			
+			const base = isAnchored ? pattern : `**/${pattern}`;
 			// Match the path itself and any children
 			return [base, `${base}/**`];
 		});
@@ -147,11 +151,11 @@ export default class ShowHiddenFilesPlugin extends Plugin {
 
 		if (!this.settings.ignoredHiddenGlobs && !loaded?.ignoredHiddenGlobs) {
 			this.settings.ignoredHiddenGlobs = [
-				".git*",
+				"/.git*",
 				".hg",
 				".svn",
 				".DS_Store",
-				".trash",
+				"/.trash",
 				this.app.vault.configDir,
 			].join("\n");
 		}
