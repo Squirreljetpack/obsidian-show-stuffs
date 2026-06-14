@@ -1,13 +1,13 @@
-# Show Hidden Files — Obsidian Plugin
+# Show Stuffs — Obsidian Plugin
 
-Reveals hidden dotfiles (`.claude/`, `.gitignore`, `.env`, `.github/`, etc.) and all file types directly in the Obsidian file explorer.
+Reveals hidden dotfiles (`.claude/`, `.gitignore`, `.env`, `.github/`, etc.), all file types, and renders local HTML images directly in Obsidian.
 
 ## Features
 
 - **Show all file types** — Exposes files with unsupported extensions (`.json`, `.yml`, `.toml`, etc.) in the file explorer. Synced with Obsidian's native "Detect all file extensions" setting.
 - **Show hidden files** — Shows files and folders whose names start with a dot, including hidden files inside subdirectories and normal files inside hidden folders.
 - **Ignored hidden globs** — Filter hidden files using glob patterns (e.g. `**/node_modules/*`, `.git/**`). Skip noisy or sensitive entries by exact name or pattern.
-- **Render local HTML images** — (Experimental) Resolves and displays local images used in HTML `<img>` tags. Useful for viewing images stored in hidden folders or non-standard paths.
+- **Render local HTML images** — Resolves and displays local images used in HTML `<img>` tags. Useful for viewing images stored in hidden folders or non-standard paths.
 
 The display toggles and **default exclusions** are enabled by default when the plugin is activated and **fully reverted** when the plugin is disabled. Only the local HTML image rendering toggle is disabled by default.
 
@@ -18,7 +18,7 @@ The display toggles and **default exclusions** are enabled by default when the p
 ### From Community Plugins (not available)
 
 1. Open **Settings → Community plugins → Browse**
-2. Search for **Show Hidden Files**
+2. Search for **Show Stuffs**
 3. Click **Install**, then **Enable**
 
 ### BRAT
@@ -26,7 +26,7 @@ The display toggles and **default exclusions** are enabled by default when the p
 Install via [BRAT](https://github.com/TfTHacker/obsidian42-brat) with the repo URL:
 
 ```
-Squirreljetpack/obsidian-show-hidden-files
+Squirreljetpack/obsidian-show-stuffs
 ```
 
 ## Settings
@@ -53,8 +53,8 @@ Research/.env
 ## Building from source
 
 ```bash
-git clone https://github.com/Squirreljetpack/obsidian-show-hidden-files.git
-cd obsidian-show-hidden-files
+git clone https://github.com/Squirreljetpack/obsidian-show-stuffs.git
+cd obsidian-show-stuffs
 npm install
 npm run build
 ```
@@ -88,3 +88,4 @@ npm run dev
 ## License
 
 [MIT](LICENSE)
+ENSE)

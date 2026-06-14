@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-06-13
+
+### Changed
+- **Plugin Rename**: Renamed the plugin from "Show Hidden Files" to **"Show Stuffs"**.
+- **Description Update**: Updated plugin description to highlight local HTML image rendering capability.
+- **Internal Refactoring**: Renamed internal classes and types to match the new plugin name.
+
 ## [1.3.0] - 2026-06-13
 
 ### Changed

@@ -87,14 +87,14 @@ class ExclusionMatcher {
 
 /* ── Settings ──────────────────────────────────────────────── */
 
-interface ShowHiddenFilesSettings {
+interface ShowStuffsSettings {
 	showAllFileTypes: boolean;
 	showHiddenFiles: boolean;
 	ignoredHiddenGlobs: string;
 	renderHtmlImages: boolean;
 }
 
-const DEFAULT_SETTINGS: ShowHiddenFilesSettings = {
+const DEFAULT_SETTINGS: ShowStuffsSettings = {
 	showAllFileTypes: true,
 	showHiddenFiles: true,
 	ignoredHiddenGlobs: "",
@@ -104,7 +104,7 @@ const DEFAULT_SETTINGS: ShowHiddenFilesSettings = {
 /* ── Live Preview Plugin ────────────────────────────────────── */
 
 class HtmlImagePluginValue implements PluginValue {
-	constructor(private view: EditorView, private plugin: ShowHiddenFilesPlugin) {
+	constructor(private view: EditorView, private plugin: ShowStuffsPlugin) {
 		this.updateImages();
 	}
 
@@ -125,8 +125,8 @@ class HtmlImagePluginValue implements PluginValue {
 
 /* ── Plugin ────────────────────────────────────────────────── */
 
-export default class ShowHiddenFilesPlugin extends Plugin {
-	settings!: ShowHiddenFilesSettings;
+export default class ShowStuffsPlugin extends Plugin {
+	settings!: ShowStuffsSettings;
 	private matcher!: ExclusionMatcher;
 	private previousShowUnsupportedFiles = false;
 	private originalReconcileDeletion:
@@ -166,7 +166,7 @@ export default class ShowHiddenFilesPlugin extends Plugin {
 			ViewPlugin.define((view) => new HtmlImagePluginValue(view, this))
 		);
 
-		this.addSettingTab(new ShowHiddenFilesSettingTab(this.app, this));
+		this.addSettingTab(new ShowStuffsSettingTab(this.app, this));
 	}
 
 	onunload() {
@@ -208,7 +208,7 @@ export default class ShowHiddenFilesPlugin extends Plugin {
 	/* ── settings persistence ──────────────────────────────── */
 
 	async loadSettings() {
-		const loaded = (await this.loadData()) as Partial<ShowHiddenFilesSettings> | null;
+		const loaded = (await this.loadData()) as Partial<ShowStuffsSettings> | null;
 
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded ?? {});
 
@@ -469,10 +469,10 @@ export default class ShowHiddenFilesPlugin extends Plugin {
 
 /* ── Settings tab ──────────────────────────────────────────── */
 
-class ShowHiddenFilesSettingTab extends PluginSettingTab {
-	plugin: ShowHiddenFilesPlugin;
+class ShowStuffsSettingTab extends PluginSettingTab {
+	plugin: ShowStuffsPlugin;
 
-	constructor(app: App, plugin: ShowHiddenFilesPlugin) {
+	constructor(app: App, plugin: ShowStuffsPlugin) {
 		super(app, plugin);
 		this.plugin = plugin;
 	}

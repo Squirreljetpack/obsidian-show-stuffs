@@ -1,9 +1,9 @@
 {
-	"id": "show-hidden-files",
-	"name": "Show Hidden Files",
-	"version": "1.3.0",
+	"id": "show-stuffs",
+	"name": "Show Stuffs",
+	"version": "1.4.0",
 	"minAppVersion": "0.15.0",
-	"description": "Reveals hidden dotfiles and all file types in the file explorer.",
+	"description": "Reveals hidden dotfiles, all file types, and renders local HTML images.",
 	"author": "Squirreljetpack",
 	"isDesktopOnly": true
 }
