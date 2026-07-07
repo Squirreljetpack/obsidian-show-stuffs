@@ -1,6 +1,7 @@
 .plain-text-container {
-	width: 100%;
+	position: relative;
 	height: 100%;
+	width: 100%;
 	padding: 0;
 	margin: 0;
 	box-sizing: border-box;
@@ -8,18 +9,187 @@
 	flex-direction: column;
 }
 
-.plain-text-textarea {
-	width: 100%;
-	height: 100%;
-	font-family: var(--font-monospace);
-	font-size: var(--font-editor-size);
-	line-height: var(--line-height-normal);
-	resize: none;
-	border: none;
-	outline: none;
-	background: transparent;
-	color: var(--text-normal);
-	padding: 24px;
-	box-sizing: border-box;
+.plain-text-editor-element {
 	flex-grow: 1;
+	height: 0;
+	width: 100%;
+	position: relative;
+	overflow: hidden;
+}
+
+.plain-text-editor-element .cm-editor {
+	display: flex !important;
+	flex-direction: column !important;
+	height: 100% !important;
+	width: 100% !important;
+}
+
+/* Style CodeMirror Search Panel to match Obsidian Native UI (Floating Card Centered) */
+.plain-text-container .cm-panels {
+	position: absolute !important;
+	top: 10px !important;
+	left: 50% !important;
+	transform: translateX(-50%) !important;
+	right: auto !important;
+	background-color: var(--background-primary) !important; /* Blends with note background */
+	border: 1px solid var(--background-modifier-border) !important; /* Visible modal outline */
+	border-radius: 6px !important;
+	box-shadow: var(--shadow-l), 0 4px 12px rgba(0, 0, 0, 0.08) !important;
+	z-index: 100 !important;
+	max-width: 550px !important;
+	display: block !important;
+}
+
+.plain-text-container .cm-panels-top {
+	border-bottom: none !important;
+}
+
+.plain-text-container .cm-panel-search,
+.plain-text-container .cm-search {
+	background-color: transparent !important;
+	color: var(--text-normal) !important;
+	padding: 10px 14px !important;
+	border: none !important;
+	position: relative !important; /* For absolute positioning of close button */
+	font-family: var(--font-interface) !important;
+}
+
+/* Inputs: borderless background, thin visible border, matching width */
+.plain-text-container .cm-panel-search input:not([type="checkbox"]),
+.plain-text-container .cm-search input:not([type="checkbox"]) {
+	background-color: transparent !important;
+	border: 1px solid var(--background-modifier-border) !important; /* Thin border even when not selected */
+	color: var(--text-normal) !important;
+	border-radius: 4px !important;
+	padding: 6px 12px !important;
+	font-size: 13px !important;
+	font-family: var(--font-interface) !important;
+	box-shadow: none !important;
+	margin: 4px 6px !important;
+	min-width: 220px !important;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+.plain-text-container .cm-panel-search input:not([type="checkbox"]):focus,
+.plain-text-container .cm-search input:not([type="checkbox"]):focus {
+	border-color: var(--interactive-accent) !important;
+	box-shadow: 0 0 0 2px var(--background-modifier-border-focus) !important;
+	outline: none !important;
+}
+
+/* Buttons: flat, borderless Obsidian native style with hover */
+.plain-text-container .cm-panel-search button,
+.plain-text-container .cm-panel-search .cm-button,
+.plain-text-container .cm-search button,
+.plain-text-container .cm-search .cm-button {
+	background: transparent !important;
+	background-color: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	color: var(--text-muted) !important;
+	border-radius: 4px !important;
+	padding: 6px 12px !important;
+	font-size: 13px !important;
+	font-weight: 500 !important;
+	cursor: pointer !important;
+	font-family: var(--font-interface) !important;
+	margin: 4px 6px !important;
+	transition: background-color 0.1s ease, color 0.1s ease !important;
+}
+
+.plain-text-container .cm-panel-search button:hover,
+.plain-text-container .cm-panel-search .cm-button:hover,
+.plain-text-container .cm-search button:hover,
+.plain-text-container .cm-search .cm-button:hover {
+	background-color: var(--background-modifier-hover) !important;
+	color: var(--text-normal) !important;
+}
+
+.plain-text-container .cm-panel-search button:active,
+.plain-text-container .cm-panel-search .cm-button:active,
+.plain-text-container .cm-search button:active,
+.plain-text-container .cm-search .cm-button:active {
+	background-color: var(--interactive-accent) !important;
+	color: var(--text-on-accent) !important;
+}
+
+/* Style close button at the top right, matching icon size */
+.plain-text-container .cm-panel-search button[name="close"],
+.plain-text-container .cm-search button[name="close"] {
+	background: transparent !important;
+	background-color: transparent !important;
+	border: none !important;
+	box-shadow: none !important;
+	color: var(--text-muted) !important;
+	border-radius: 4px !important;
+	width: 28px !important;
+	height: 28px !important;
+	padding: 0 !important;
+	cursor: pointer !important;
+	display: inline-flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	font-size: 16px !important;
+	position: absolute !important;
+	top: 14px !important;
+	right: 18px !important;
+	margin: 0 !important;
+}
+
+.plain-text-container .cm-panel-search button[name="close"]:hover,
+.plain-text-container .cm-search button[name="close"]:hover {
+	background-color: var(--background-modifier-hover) !important;
+	color: var(--text-normal) !important;
+}
+
+/* Style checkbox labels */
+.plain-text-container .cm-panel-search label,
+.plain-text-container .cm-search label {
+	display: inline-flex !important;
+	align-items: center !important;
+	gap: 6px !important;
+	font-size: 13px !important;
+	color: var(--text-muted) !important;
+	cursor: pointer !important;
+	user-select: none !important;
+	margin: 4px 8px !important;
+	vertical-align: middle !important;
+	transition: color 0.1s ease !important;
+}
+
+.plain-text-container .cm-panel-search label:hover,
+.plain-text-container .cm-search label:hover {
+	color: var(--text-normal) !important;
+}
+
+.plain-text-container .cm-panel-search input[type="checkbox"],
+.plain-text-container .cm-search input[type="checkbox"] {
+	cursor: pointer !important;
+	accent-color: var(--interactive-accent) !important;
+	width: 14px !important;
+	height: 14px !important;
+	margin: 0 !important;
+	vertical-align: middle !important;
+}
+
+/* Style search status message */
+.plain-text-container .cm-panel-search [main-name="search-status"],
+.plain-text-container .cm-search [main-name="search-status"] {
+	font-size: 12px !important;
+	color: var(--text-muted) !important;
+	margin-left: 8px !important;
+}
+
+/* Custom Line Numbers toggle button inside the search bar (styled flat as well) */
+.plain-text-container .plain-text-gutter-toggle {
+	margin-left: auto !important; /* Push it to the far right of row 2 */
+	border: none !important;
+	background-color: transparent !important;
+	color: var(--text-muted) !important;
+	font-weight: 600 !important;
+}
+
+.plain-text-container .plain-text-gutter-toggle:hover {
+	background-color: var(--background-modifier-hover) !important;
+	color: var(--text-normal) !important;
 }

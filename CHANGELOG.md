@@ -1,3 +1,9 @@
+## [1.5.0] - 2026-07-07
+
+### 🚀 Features
+
+- Plain text viewer
+
 # Changelog
 
 All notable changes to this project will be documented in this file.

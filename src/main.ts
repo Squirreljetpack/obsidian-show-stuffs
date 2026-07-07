@@ -1,7 +1,10 @@
 import { lstat, readdir } from "fs/promises";
 import type { Dirent } from "fs";
 import { Plugin, PluginSettingTab, Setting, App, TFile, MarkdownPostProcessorContext, TextFileView, WorkspaceLeaf, Notice } from "obsidian";
-import { EditorView, ViewUpdate, ViewPlugin, PluginValue } from "@codemirror/view";
+import { EditorView, ViewUpdate, ViewPlugin, PluginValue, keymap, drawSelection, highlightActiveLine, lineNumbers } from "@codemirror/view";
+import { EditorState, Compartment } from "@codemirror/state";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { search, openSearchPanel, closeSearchPanel, searchKeymap } from "@codemirror/search";
 import picomatch from "picomatch";
 
 /* ── Type augmentations for internal Obsidian APIs ─────────── */
@@ -106,7 +109,9 @@ const DEFAULT_SETTINGS: ShowStuffsSettings = {
 export const VIEW_TYPE_PLAIN_TEXT = "plain-text-view";
 
 class PlainTextView extends TextFileView {
-	textArea!: HTMLTextAreaElement;
+	editorView!: EditorView;
+	lineNumbersCompartment = new Compartment();
+	showLineNumbers = true;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -122,33 +127,122 @@ class PlainTextView extends TextFileView {
 
 	async onOpen() {
 		this.contentEl.empty();
+		
 		const container = this.contentEl.createDiv({ cls: "plain-text-container" });
-		this.textArea = container.createEl("textarea", {
-			cls: "plain-text-textarea"
+
+		// 1. Build Editor Container
+		const editorEl = container.createDiv({ cls: "plain-text-editor-element" });
+
+		// 2. Initialize CodeMirror 6 EditorState
+		const state = EditorState.create({
+			doc: "",
+			extensions: [
+				this.lineNumbersCompartment.of(this.showLineNumbers ? lineNumbers() : []),
+				highlightActiveLine(),
+				drawSelection(),
+				history(),
+				search({ top: true }),
+				keymap.of([
+					...defaultKeymap,
+					...historyKeymap,
+					...searchKeymap,
+				]),
+				EditorView.updateListener.of((update) => {
+					if (update.docChanged) {
+						this.requestSave();
+					}
+					// Dynamically append a 'Line Numbers' toggle button to CodeMirror's native search bar
+					const searchPanel = this.editorView.dom.querySelector(".cm-panel-search, .cm-search");
+					if (searchPanel && !searchPanel.querySelector(".plain-text-gutter-toggle")) {
+						const toggleBtn = document.createElement("button");
+						toggleBtn.className = "cm-button plain-text-gutter-toggle";
+						toggleBtn.innerText = "Line Numbers";
+						toggleBtn.addEventListener("click", () => {
+							this.toggleLineNumbers();
+						});
+						searchPanel.appendChild(toggleBtn);
+					}
+				}),
+				EditorView.theme({
+					"&": {
+						height: "100%",
+						width: "100%",
+					},
+					".cm-scroller": {
+						fontFamily: "var(--font-monospace)",
+						fontSize: "var(--font-editor-size)",
+						lineHeight: "var(--line-height-normal)",
+					},
+					"&.cm-focused": {
+						outline: "none",
+					}
+				}),
+			]
 		});
-		this.textArea.addEventListener("input", () => {
-			this.requestSave();
+
+		this.editorView = new EditorView({
+			state,
+			parent: editorEl,
+		});
+
+		// 3. Trigger Search Panel on Selection (mouseup for mouse drag, keyup for keyboard selection)
+		const checkSelectionAndOpenSearch = () => {
+			const state = this.editorView.state;
+			const selection = state.selection.main;
+			if (!selection.empty) {
+				const selectedText = state.doc.sliceString(selection.from, selection.to);
+				if (selectedText.trim().length > 0 && selectedText.indexOf("\n") === -1) {
+					openSearchPanel(this.editorView);
+				}
+			}
+		};
+
+		this.editorView.contentDOM.addEventListener("mouseup", () => {
+			setTimeout(checkSelectionAndOpenSearch, 10);
+		});
+
+		this.editorView.contentDOM.addEventListener("keyup", (e: KeyboardEvent) => {
+			if (e.shiftKey) {
+				setTimeout(checkSelectionAndOpenSearch, 10);
+			}
 		});
 	}
 
 	async onClose() {
+		if (this.editorView) {
+			this.editorView.destroy();
+		}
 		this.contentEl.empty();
 	}
 
 	getViewData() {
-		return this.textArea ? this.textArea.value : "";
+		return this.editorView ? this.editorView.state.doc.toString() : "";
 	}
 
 	setViewData(data: string, clear: boolean) {
-		if (this.textArea) {
-			this.textArea.value = data;
+		if (this.editorView) {
+			const transaction = this.editorView.state.update({
+				changes: { from: 0, to: this.editorView.state.doc.length, insert: data }
+			});
+			this.editorView.dispatch(transaction);
 		}
 	}
 
 	clear() {
-		if (this.textArea) {
-			this.textArea.value = "";
+		if (this.editorView) {
+			closeSearchPanel(this.editorView);
+			const transaction = this.editorView.state.update({
+				changes: { from: 0, to: this.editorView.state.doc.length, insert: "" }
+			});
+			this.editorView.dispatch(transaction);
 		}
+	}
+
+	toggleLineNumbers() {
+		this.showLineNumbers = !this.showLineNumbers;
+		this.editorView.dispatch({
+			effects: this.lineNumbersCompartment.reconfigure(this.showLineNumbers ? lineNumbers() : [])
+		});
 	}
 }
 

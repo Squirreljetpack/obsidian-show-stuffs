@@ -8,7 +8,7 @@ Reveals hidden dotfiles (`.claude/`, `.gitignore`, `.env`, `.github/`, etc.), al
 - **Show hidden files** — Shows files and folders whose names start with a dot, including hidden files inside subdirectories and normal files inside hidden folders.
 - **Ignored hidden globs** — Filter hidden files using glob patterns (e.g. `**/node_modules/*`, `.git/`). Children of skipped paths are also skipped.
 - **Render local HTML images** — Resolves and displays local images used in HTML `<img>` tags. Useful for viewing images stored in hidden folders or non-standard paths.
-- **Open as plain text** — Allows configuring specific file extensions (such as `.txt`, `.log`, `.conf`) to be opened directly in Obsidian using a clean, plain text editor view with no formatting, markdown parsing, or syntax highlighting.
+- **Open as plain text** — Right click to open plain text files directly in Obsidian.
 
 > **Note:** Enabling this plugin exposes sensitive dotfiles (`.env`, `.git-credentials`, etc.) in the Obsidian file explorer, making them viewable, editable, and deletable. Make sure you understand what these files are before modifying them.
 
