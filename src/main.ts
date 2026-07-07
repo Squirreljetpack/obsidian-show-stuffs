@@ -1,6 +1,6 @@
 import { lstat, readdir } from "fs/promises";
 import type { Dirent } from "fs";
-import { Plugin, PluginSettingTab, Setting, App, TFile, MarkdownPostProcessorContext } from "obsidian";
+import { Plugin, PluginSettingTab, Setting, App, TFile, MarkdownPostProcessorContext, TextFileView, WorkspaceLeaf, Notice } from "obsidian";
 import { EditorView, ViewUpdate, ViewPlugin, PluginValue } from "@codemirror/view";
 import picomatch from "picomatch";
 
@@ -92,6 +92,7 @@ interface ShowStuffsSettings {
 	showHiddenFiles: boolean;
 	ignoredHiddenGlobs: string;
 	renderHtmlImages: boolean;
+	plainTextExtensions: string;
 }
 
 const DEFAULT_SETTINGS: ShowStuffsSettings = {
@@ -99,7 +100,57 @@ const DEFAULT_SETTINGS: ShowStuffsSettings = {
 	showHiddenFiles: true,
 	ignoredHiddenGlobs: "",
 	renderHtmlImages: false,
+	plainTextExtensions: "",
 };
+
+export const VIEW_TYPE_PLAIN_TEXT = "plain-text-view";
+
+class PlainTextView extends TextFileView {
+	textArea!: HTMLTextAreaElement;
+
+	constructor(leaf: WorkspaceLeaf) {
+		super(leaf);
+	}
+
+	getViewType() {
+		return VIEW_TYPE_PLAIN_TEXT;
+	}
+
+	getIcon() {
+		return "document";
+	}
+
+	async onOpen() {
+		this.contentEl.empty();
+		const container = this.contentEl.createDiv({ cls: "plain-text-container" });
+		this.textArea = container.createEl("textarea", {
+			cls: "plain-text-textarea"
+		});
+		this.textArea.addEventListener("input", () => {
+			this.requestSave();
+		});
+	}
+
+	async onClose() {
+		this.contentEl.empty();
+	}
+
+	getViewData() {
+		return this.textArea ? this.textArea.value : "";
+	}
+
+	setViewData(data: string, clear: boolean) {
+		if (this.textArea) {
+			this.textArea.value = data;
+		}
+	}
+
+	clear() {
+		if (this.textArea) {
+			this.textArea.value = "";
+		}
+	}
+}
 
 /* ── Live Preview Plugin ────────────────────────────────────── */
 
@@ -138,6 +189,36 @@ export default class ShowStuffsPlugin extends Plugin {
 
 	async onload() {
 		await this.loadSettings();
+
+		this.registerView(
+			VIEW_TYPE_PLAIN_TEXT,
+			(leaf) => new PlainTextView(leaf)
+		);
+
+		const plainTextExtensions = parseMultilineSetting(this.settings.plainTextExtensions);
+		if (plainTextExtensions.length > 0) {
+			this.registerExtensions(plainTextExtensions, VIEW_TYPE_PLAIN_TEXT);
+		}
+
+		this.registerEvent(
+			this.app.workspace.on("file-menu", (menu, file) => {
+				if (file instanceof TFile) {
+					menu.addItem((item) => {
+						item
+							.setTitle("Open as plain text")
+							.setIcon("document")
+							.onClick(async () => {
+								const leaf = this.app.workspace.getLeaf(true);
+								await leaf.setViewState({
+									type: VIEW_TYPE_PLAIN_TEXT,
+									active: true,
+									state: { file: file.path }
+								});
+							});
+					});
+				}
+			})
+		);
 
 		this.previousShowUnsupportedFiles =
 			(this.app.vault.getConfig("showUnsupportedFiles") as boolean) ??
@@ -531,6 +612,23 @@ class ShowStuffsSettingTab extends PluginSettingTab {
 						this.plugin.scheduleHiddenFilesRefresh();
 					});
 				text.inputEl.rows = 6;
+			});
+
+		new Setting(containerEl)
+			.setName("Open as plain text")
+			.setDesc(
+				"File extensions to open directly in Obsidian as plain text (no formatting/highlighting). " +
+					"Comma- or newline-separated. Requires disabling and re-enabling this plugin to apply changes.",
+			)
+			.addTextArea((text) => {
+				text.setPlaceholder("txt, log, conf")
+					.setValue(this.plugin.settings.plainTextExtensions)
+					.onChange(async (value) => {
+						this.plugin.settings.plainTextExtensions = value;
+						await this.plugin.saveSettings();
+						new Notice("Please disable and re-enable the plugin to update registered extensions.");
+					});
+				text.inputEl.rows = 3;
 			});
 
 		containerEl.createEl("h3", { text: "Experimental" });

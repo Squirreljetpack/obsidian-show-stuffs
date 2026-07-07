@@ -1,6 +1,6 @@
 # Show Stuffs — Obsidian Plugin
 
-Reveals hidden dotfiles (`.claude/`, `.gitignore`, `.env`, `.github/`, etc.), all file types, and renders local HTML images directly in Obsidian.
+Reveals hidden dotfiles (`.claude/`, `.gitignore`, `.env`, `.github/`, etc.), all file types, renders local HTML images, and opens specific plain text files directly in Obsidian.
 
 ## Features
 
@@ -8,6 +8,7 @@ Reveals hidden dotfiles (`.claude/`, `.gitignore`, `.env`, `.github/`, etc.), al
 - **Show hidden files** — Shows files and folders whose names start with a dot, including hidden files inside subdirectories and normal files inside hidden folders.
 - **Ignored hidden globs** — Filter hidden files using glob patterns (e.g. `**/node_modules/*`, `.git/`). Children of skipped paths are also skipped.
 - **Render local HTML images** — Resolves and displays local images used in HTML `<img>` tags. Useful for viewing images stored in hidden folders or non-standard paths.
+- **Open as plain text** — Allows configuring specific file extensions (such as `.txt`, `.log`, `.conf`) to be opened directly in Obsidian using a clean, plain text editor view with no formatting, markdown parsing, or syntax highlighting.
 
 > **Note:** Enabling this plugin exposes sensitive dotfiles (`.env`, `.git-credentials`, etc.) in the Obsidian file explorer, making them viewable, editable, and deletable. Make sure you understand what these files are before modifying them.
 
@@ -34,6 +35,7 @@ Squirreljetpack/obsidian-show-stuffs
 | Show all file types | **On** | Toggle unsupported file extensions in the explorer. Mirrors Obsidian's native "Detect all file extensions" option. |
 | Show hidden files | **On** | Toggle dotfiles and dotfolders in the explorer, including nested hidden paths. |
 | Ignored hidden globs | `/.git*`, `.hg`, `.svn`, `.DS_Store`, `/.trash`, `.obsidian` | Filter hidden files using glob patterns (e.g. `**/node_modules/*`, `.git/**`). One pattern per line. Names without separators match any path segment. |
+| Open as plain text | Empty | File extensions to open directly in Obsidian as plain text (no formatting/highlighting). Comma- or newline-separated. Requires disabling and re-enabling this plugin to apply changes. |
 | Render local HTML images | Off | Resolve and display local images in HTML `<img>` tags. |
 
 Examples for **Ignored hidden globs**:
