@@ -180,16 +180,25 @@
 	margin-left: 8px !important;
 }
 
-/* Custom Line Numbers toggle button inside the search bar (styled flat as well) */
-.plain-text-container .plain-text-gutter-toggle {
-	margin-left: auto !important; /* Push it to the far right of row 2 */
+/* Custom Line Numbers and Line Wrap toggle buttons inside the search bar (styled flat as well) */
+.plain-text-container .plain-text-gutter-toggle,
+.plain-text-container .plain-text-wrap-toggle {
 	border: none !important;
 	background-color: transparent !important;
 	color: var(--text-muted) !important;
 	font-weight: 600 !important;
 }
 
-.plain-text-container .plain-text-gutter-toggle:hover {
+.plain-text-container .plain-text-gutter-toggle {
+	margin-left: auto !important; /* Push it to the far right of row 2 */
+}
+
+.plain-text-container .plain-text-wrap-toggle {
+	margin-left: 8px !important;
+}
+
+.plain-text-container .plain-text-gutter-toggle:hover,
+.plain-text-container .plain-text-wrap-toggle:hover {
 	background-color: var(--background-modifier-hover) !important;
 	color: var(--text-normal) !important;
 }

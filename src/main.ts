@@ -1,6 +1,6 @@
 import { lstat, readdir } from "fs/promises";
 import type { Dirent } from "fs";
-import { Plugin, PluginSettingTab, Setting, App, TFile, MarkdownPostProcessorContext, TextFileView, WorkspaceLeaf, Notice } from "obsidian";
+import { Plugin, PluginSettingTab, Setting, App, TFile, MarkdownPostProcessorContext, TextFileView, WorkspaceLeaf } from "obsidian";
 import { EditorView, ViewUpdate, ViewPlugin, PluginValue, keymap, drawSelection, highlightActiveLine, lineNumbers } from "@codemirror/view";
 import { EditorState, Compartment } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
@@ -103,7 +103,7 @@ const DEFAULT_SETTINGS: ShowStuffsSettings = {
 	showHiddenFiles: true,
 	ignoredHiddenGlobs: "",
 	renderHtmlImages: false,
-	plainTextExtensions: "",
+	plainTextExtensions: "txt, log, conf",
 };
 
 export const VIEW_TYPE_PLAIN_TEXT = "plain-text-view";
@@ -112,6 +112,8 @@ class PlainTextView extends TextFileView {
 	editorView!: EditorView;
 	lineNumbersCompartment = new Compartment();
 	showLineNumbers = true;
+	lineWrappingCompartment = new Compartment();
+	showLineWrapping = false;
 
 	constructor(leaf: WorkspaceLeaf) {
 		super(leaf);
@@ -138,6 +140,7 @@ class PlainTextView extends TextFileView {
 			doc: "",
 			extensions: [
 				this.lineNumbersCompartment.of(this.showLineNumbers ? lineNumbers() : []),
+				this.lineWrappingCompartment.of(this.showLineWrapping ? EditorView.lineWrapping : []),
 				highlightActiveLine(),
 				drawSelection(),
 				history(),
@@ -151,16 +154,27 @@ class PlainTextView extends TextFileView {
 					if (update.docChanged) {
 						this.requestSave();
 					}
-					// Dynamically append a 'Line Numbers' toggle button to CodeMirror's native search bar
+					// Dynamically append 'Line Numbers' and 'Line Wrap' toggle buttons to CodeMirror's native search bar
 					const searchPanel = this.editorView.dom.querySelector(".cm-panel-search, .cm-search");
-					if (searchPanel && !searchPanel.querySelector(".plain-text-gutter-toggle")) {
-						const toggleBtn = document.createElement("button");
-						toggleBtn.className = "cm-button plain-text-gutter-toggle";
-						toggleBtn.innerText = "Line Numbers";
-						toggleBtn.addEventListener("click", () => {
-							this.toggleLineNumbers();
-						});
-						searchPanel.appendChild(toggleBtn);
+					if (searchPanel) {
+						if (!searchPanel.querySelector(".plain-text-gutter-toggle")) {
+							const toggleBtn = document.createElement("button");
+							toggleBtn.className = "cm-button plain-text-gutter-toggle";
+							toggleBtn.innerText = "Line Numbers";
+							toggleBtn.addEventListener("click", () => {
+								this.toggleLineNumbers();
+							});
+							searchPanel.appendChild(toggleBtn);
+						}
+						if (!searchPanel.querySelector(".plain-text-wrap-toggle")) {
+							const toggleWrapBtn = document.createElement("button");
+							toggleWrapBtn.className = "cm-button plain-text-wrap-toggle";
+							toggleWrapBtn.innerText = "Line Wrap";
+							toggleWrapBtn.addEventListener("click", () => {
+								this.toggleLineWrapping();
+							});
+							searchPanel.appendChild(toggleWrapBtn);
+						}
 					}
 				}),
 				EditorView.theme({
@@ -242,6 +256,13 @@ class PlainTextView extends TextFileView {
 		this.showLineNumbers = !this.showLineNumbers;
 		this.editorView.dispatch({
 			effects: this.lineNumbersCompartment.reconfigure(this.showLineNumbers ? lineNumbers() : [])
+		});
+	}
+
+	toggleLineWrapping() {
+		this.showLineWrapping = !this.showLineWrapping;
+		this.editorView.dispatch({
+			effects: this.lineWrappingCompartment.reconfigure(this.showLineWrapping ? EditorView.lineWrapping : [])
 		});
 	}
 }
@@ -720,7 +741,6 @@ class ShowStuffsSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.plainTextExtensions = value;
 						await this.plugin.saveSettings();
-						new Notice("Please disable and re-enable the plugin to update registered extensions.");
 					});
 				text.inputEl.rows = 3;
 			});
