@@ -35,7 +35,7 @@ Squirreljetpack/obsidian-show-stuffs
 | Show all file types | **On** | Toggle unsupported file extensions in the explorer. Mirrors Obsidian's native "Detect all file extensions" option. |
 | Show hidden files | **On** | Toggle dotfiles and dotfolders in the explorer, including nested hidden paths. |
 | Ignored hidden globs | `/.git*`, `.hg`, `.svn`, `.DS_Store`, `/.trash`, `.obsidian` | Filter hidden files using glob patterns (e.g. `**/node_modules/*`, `.git/**`). One pattern per line. Names without separators match any path segment. |
-| Open as plain text | Empty | File extensions to open directly in Obsidian as plain text (no formatting/highlighting). Comma- or newline-separated. Requires disabling and re-enabling this plugin to apply changes. |
+| Open as plain text | `txt`, `log`, `conf` | File extensions to open directly in Obsidian as plain text (no formatting/highlighting). Comma- or newline-separated. Requires disabling and re-enabling this plugin to apply changes. |
 | Render local HTML images | Off | Resolve and display local images in HTML `<img>` tags. |
 
 Examples for **Ignored hidden globs**:

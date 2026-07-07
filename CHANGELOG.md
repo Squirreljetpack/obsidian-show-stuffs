@@ -1,3 +1,9 @@
+## [1.6.0] - 2026-07-07
+
+### 🚀 Features
+
+- Line wrap for plain text
+
 ## [1.5.0] - 2026-07-07
 
 ### 🚀 Features
