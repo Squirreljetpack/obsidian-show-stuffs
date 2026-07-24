@@ -1,3 +1,9 @@
+## [1.7.0] - 2026-07-23
+
+### 🚀 Features
+
+- Line Numbers and Line Wrap buttons active hover effects & dark/light mode line number gutter styling
+
 ## [1.6.0] - 2026-07-07
 
 ### 🚀 Features
