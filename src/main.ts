@@ -155,26 +155,9 @@ class PlainTextView extends TextFileView {
 						this.requestSave();
 					}
 					// Dynamically append 'Line Numbers' and 'Line Wrap' toggle buttons to CodeMirror's native search bar
-					const searchPanel = this.editorView.dom.querySelector(".cm-panel-search, .cm-search");
+					const searchPanel = this.editorView?.dom?.querySelector(".cm-panel-search, .cm-search");
 					if (searchPanel) {
-						if (!searchPanel.querySelector(".plain-text-gutter-toggle")) {
-							const toggleBtn = document.createElement("button");
-							toggleBtn.className = "cm-button plain-text-gutter-toggle";
-							toggleBtn.innerText = "Line Numbers";
-							toggleBtn.addEventListener("click", () => {
-								this.toggleLineNumbers();
-							});
-							searchPanel.appendChild(toggleBtn);
-						}
-						if (!searchPanel.querySelector(".plain-text-wrap-toggle")) {
-							const toggleWrapBtn = document.createElement("button");
-							toggleWrapBtn.className = "cm-button plain-text-wrap-toggle";
-							toggleWrapBtn.innerText = "Line Wrap";
-							toggleWrapBtn.addEventListener("click", () => {
-								this.toggleLineWrapping();
-							});
-							searchPanel.appendChild(toggleWrapBtn);
-						}
+						this.updateToggleButtons(searchPanel);
 					}
 				}),
 				EditorView.theme({
@@ -252,11 +235,41 @@ class PlainTextView extends TextFileView {
 		}
 	}
 
+	updateToggleButtons(searchPanel: Element) {
+		let toggleBtn = searchPanel.querySelector(".plain-text-gutter-toggle") as HTMLButtonElement | null;
+		if (!toggleBtn) {
+			toggleBtn = document.createElement("button");
+			toggleBtn.className = "cm-button plain-text-gutter-toggle";
+			toggleBtn.innerText = "Line Numbers";
+			toggleBtn.addEventListener("click", () => {
+				this.toggleLineNumbers();
+			});
+			searchPanel.appendChild(toggleBtn);
+		}
+		toggleBtn.classList.toggle("is-active", this.showLineNumbers);
+
+		let toggleWrapBtn = searchPanel.querySelector(".plain-text-wrap-toggle") as HTMLButtonElement | null;
+		if (!toggleWrapBtn) {
+			toggleWrapBtn = document.createElement("button");
+			toggleWrapBtn.className = "cm-button plain-text-wrap-toggle";
+			toggleWrapBtn.innerText = "Line Wrap";
+			toggleWrapBtn.addEventListener("click", () => {
+				this.toggleLineWrapping();
+			});
+			searchPanel.appendChild(toggleWrapBtn);
+		}
+		toggleWrapBtn.classList.toggle("is-active", this.showLineWrapping);
+	}
+
 	toggleLineNumbers() {
 		this.showLineNumbers = !this.showLineNumbers;
 		this.editorView.dispatch({
 			effects: this.lineNumbersCompartment.reconfigure(this.showLineNumbers ? lineNumbers() : [])
 		});
+		const searchPanel = this.editorView?.dom?.querySelector(".cm-panel-search, .cm-search");
+		if (searchPanel) {
+			this.updateToggleButtons(searchPanel);
+		}
 	}
 
 	toggleLineWrapping() {
@@ -264,6 +277,10 @@ class PlainTextView extends TextFileView {
 		this.editorView.dispatch({
 			effects: this.lineWrappingCompartment.reconfigure(this.showLineWrapping ? EditorView.lineWrapping : [])
 		});
+		const searchPanel = this.editorView?.dom?.querySelector(".cm-panel-search, .cm-search");
+		if (searchPanel) {
+			this.updateToggleButtons(searchPanel);
+		}
 	}
 }
 

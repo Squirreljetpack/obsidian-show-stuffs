@@ -180,13 +180,14 @@
 	margin-left: 8px !important;
 }
 
-/* Custom Line Numbers and Line Wrap toggle buttons inside the search bar (styled flat as well) */
+/* Custom Line Numbers and Line Wrap toggle buttons inside the search bar */
 .plain-text-container .plain-text-gutter-toggle,
 .plain-text-container .plain-text-wrap-toggle {
 	border: none !important;
 	background-color: transparent !important;
 	color: var(--text-muted) !important;
 	font-weight: 600 !important;
+	transition: background-color 0.15s ease, color 0.15s ease, opacity 0.15s ease, filter 0.15s ease !important;
 }
 
 .plain-text-container .plain-text-gutter-toggle {
@@ -202,3 +203,69 @@
 	background-color: var(--background-modifier-hover) !important;
 	color: var(--text-normal) !important;
 }
+
+/* Active state for Line Numbers and Line Wrap toggle buttons */
+.plain-text-container .plain-text-gutter-toggle.is-active,
+.plain-text-container .plain-text-wrap-toggle.is-active {
+	background-color: var(--interactive-accent) !important;
+	color: var(--text-on-accent) !important;
+}
+
+/* Hover effect for active state */
+.plain-text-container .plain-text-gutter-toggle.is-active:hover,
+.plain-text-container .plain-text-wrap-toggle.is-active:hover {
+	background-color: var(--interactive-accent-hover, var(--interactive-accent)) !important;
+	color: var(--text-on-accent) !important;
+	filter: brightness(1.15) !important;
+	opacity: 0.95 !important;
+}
+
+/* CodeMirror Line Numbers Gutter Styles (Theme Adaptive) */
+.plain-text-container .cm-gutters {
+	background-color: var(--background-secondary) !important;
+	color: var(--text-muted) !important;
+	border-right: 1px solid var(--background-modifier-border) !important;
+}
+
+.plain-text-container .cm-gutterElement {
+	color: var(--text-muted) !important;
+	padding: 0 8px 0 12px !important;
+}
+
+.plain-text-container .cm-gutterElement.cm-activeLineGutter {
+	color: var(--text-normal) !important;
+	font-weight: 600 !important;
+}
+
+/* Light Mode specific line number gutter styles */
+.theme-light .plain-text-container .cm-gutters {
+	background-color: var(--background-secondary, #f8f9fa) !important;
+	color: var(--text-muted, #6c757d) !important;
+	border-right: 1px solid var(--background-modifier-border, #e9ecef) !important;
+}
+
+.theme-light .plain-text-container .cm-gutterElement {
+	color: var(--text-muted, #868e96) !important;
+}
+
+.theme-light .plain-text-container .cm-gutterElement.cm-activeLineGutter {
+	color: var(--text-normal, #212529) !important;
+	background-color: var(--background-secondary-alt, rgba(0, 0, 0, 0.04)) !important;
+}
+
+/* Dark Mode specific line number gutter styles */
+.theme-dark .plain-text-container .cm-gutters {
+	background-color: var(--background-secondary, #1e1e1e) !important;
+	color: var(--text-muted, #808080) !important;
+	border-right: 1px solid var(--background-modifier-border, #333333) !important;
+}
+
+.theme-dark .plain-text-container .cm-gutterElement {
+	color: var(--text-muted, #6e6e6e) !important;
+}
+
+.theme-dark .plain-text-container .cm-gutterElement.cm-activeLineGutter {
+	color: var(--text-normal, #dcddde) !important;
+	background-color: var(--background-secondary-alt, rgba(255, 255, 255, 0.05)) !important;
+}
+
