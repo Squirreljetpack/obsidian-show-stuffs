@@ -1,10 +1,41 @@
 import { lstat, readdir } from "fs/promises";
 import type { Dirent } from "fs";
-import { Plugin, PluginSettingTab, Setting, App, TFile, MarkdownPostProcessorContext, TextFileView, WorkspaceLeaf } from "obsidian";
-import { EditorView, ViewUpdate, ViewPlugin, PluginValue, keymap, drawSelection, highlightActiveLine, lineNumbers } from "@codemirror/view";
+import {
+	Plugin,
+	PluginSettingTab,
+	Setting,
+	App,
+	TFile,
+	MarkdownPostProcessorContext,
+	TextFileView,
+	WorkspaceLeaf,
+	MarkdownView,
+} from "obsidian";
+import {
+	EditorView,
+	ViewUpdate,
+	ViewPlugin,
+	PluginValue,
+	keymap,
+	drawSelection,
+	highlightActiveLine,
+	lineNumbers,
+} from "@codemirror/view";
+import { MouseWheelZoomManager } from "./utils/mousewheel-zoom.js";
+import { ModifierKey } from "./utils/image-zoom-util.js";
+import {
+	ImagePopup,
+	PopupViewSettings,
+	isModifierPressed,
+} from "./image-popup.js";
 import { EditorState, Compartment } from "@codemirror/state";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { search, openSearchPanel, closeSearchPanel, searchKeymap } from "@codemirror/search";
+import {
+	search,
+	openSearchPanel,
+	closeSearchPanel,
+	searchKeymap,
+} from "@codemirror/search";
 import picomatch from "picomatch";
 
 /* ── Type augmentations for internal Obsidian APIs ─────────── */
@@ -63,15 +94,15 @@ class ExclusionMatcher {
 		// Transform globs to handle both exact matches and child paths
 		const transformedGlobs = globs.flatMap((glob) => {
 			const isAnchored =
-			  glob.startsWith("/") ||
-			  glob.startsWith("\\") ||
-			  glob.slice(0, -1).includes("/") ||
-			  glob.slice(0, -1).includes("\\");
-			  
+				glob.startsWith("/") ||
+				glob.startsWith("\\") ||
+				glob.slice(0, -1).includes("/") ||
+				glob.slice(0, -1).includes("\\");
+
 			// "support" windows style paths
 			const pattern = normalizeVaultPath(glob).trim();
 			if (!pattern) return [];
-			
+
 			const base = isAnchored ? pattern : `**/${pattern}`;
 			// Match the path itself and any children
 			return [base, `${base}/**`];
@@ -96,6 +127,20 @@ interface ShowStuffsSettings {
 	ignoredHiddenGlobs: string;
 	renderHtmlImages: boolean;
 	plainTextExtensions: string;
+	persistentZoomModifier: ModifierKey | "disabled";
+	mouseWheelZoomStepSize: number;
+	popupClickModifier: ModifierKey | "none" | "disabled";
+	popupWidthPercent: number;
+	popupMaxWidth: number;
+	popupHeightPercent: number;
+	popupMaxHeight: number;
+	popupUpscaleImage: boolean;
+	borderOuterWidth: number;
+	borderMiddleWidth: number;
+	borderInnerWidth: number;
+	borderOuterColor: string;
+	borderMiddleColor: string;
+	popupBgOpacity: number;
 }
 
 const DEFAULT_SETTINGS: ShowStuffsSettings = {
@@ -104,6 +149,20 @@ const DEFAULT_SETTINGS: ShowStuffsSettings = {
 	ignoredHiddenGlobs: "",
 	renderHtmlImages: false,
 	plainTextExtensions: "txt, log, conf",
+	persistentZoomModifier: ModifierKey.ALT,
+	mouseWheelZoomStepSize: 10,
+	popupClickModifier: "none",
+	popupWidthPercent: 90,
+	popupMaxWidth: 0,
+	popupHeightPercent: 90,
+	popupMaxHeight: 0,
+	popupUpscaleImage: true,
+	borderOuterWidth: 2,
+	borderMiddleWidth: 3,
+	borderInnerWidth: 2,
+	borderOuterColor: "#10082D",
+	borderMiddleColor: "#BFBAB5",
+	popupBgOpacity: 50,
 };
 
 export const VIEW_TYPE_PLAIN_TEXT = "plain-text-view";
@@ -129,7 +188,7 @@ class PlainTextView extends TextFileView {
 
 	async onOpen() {
 		this.contentEl.empty();
-		
+
 		const container = this.contentEl.createDiv({ cls: "plain-text-container" });
 
 		// 1. Build Editor Container
@@ -139,23 +198,25 @@ class PlainTextView extends TextFileView {
 		const state = EditorState.create({
 			doc: "",
 			extensions: [
-				this.lineNumbersCompartment.of(this.showLineNumbers ? lineNumbers() : []),
-				this.lineWrappingCompartment.of(this.showLineWrapping ? EditorView.lineWrapping : []),
+				this.lineNumbersCompartment.of(
+					this.showLineNumbers ? lineNumbers() : [],
+				),
+				this.lineWrappingCompartment.of(
+					this.showLineWrapping ? EditorView.lineWrapping : [],
+				),
 				highlightActiveLine(),
 				drawSelection(),
 				history(),
 				search({ top: true }),
-				keymap.of([
-					...defaultKeymap,
-					...historyKeymap,
-					...searchKeymap,
-				]),
+				keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
 				EditorView.updateListener.of((update) => {
 					if (update.docChanged) {
 						this.requestSave();
 					}
 					// Dynamically append 'Line Numbers' and 'Line Wrap' toggle buttons to CodeMirror's native search bar
-					const searchPanel = this.editorView?.dom?.querySelector(".cm-panel-search, .cm-search");
+					const searchPanel = this.editorView?.dom?.querySelector(
+						".cm-panel-search, .cm-search",
+					);
 					if (searchPanel) {
 						this.updateToggleButtons(searchPanel);
 					}
@@ -172,9 +233,9 @@ class PlainTextView extends TextFileView {
 					},
 					"&.cm-focused": {
 						outline: "none",
-					}
+					},
 				}),
-			]
+			],
 		});
 
 		this.editorView = new EditorView({
@@ -187,8 +248,14 @@ class PlainTextView extends TextFileView {
 			const state = this.editorView.state;
 			const selection = state.selection.main;
 			if (!selection.empty) {
-				const selectedText = state.doc.sliceString(selection.from, selection.to);
-				if (selectedText.trim().length > 0 && selectedText.indexOf("\n") === -1) {
+				const selectedText = state.doc.sliceString(
+					selection.from,
+					selection.to,
+				);
+				if (
+					selectedText.trim().length > 0 &&
+					selectedText.indexOf("\n") === -1
+				) {
 					openSearchPanel(this.editorView);
 				}
 			}
@@ -216,10 +283,14 @@ class PlainTextView extends TextFileView {
 		return this.editorView ? this.editorView.state.doc.toString() : "";
 	}
 
-	setViewData(data: string, clear: boolean) {
+	setViewData(data: string, _clear: boolean) {
 		if (this.editorView) {
 			const transaction = this.editorView.state.update({
-				changes: { from: 0, to: this.editorView.state.doc.length, insert: data }
+				changes: {
+					from: 0,
+					to: this.editorView.state.doc.length,
+					insert: data,
+				},
 			});
 			this.editorView.dispatch(transaction);
 		}
@@ -229,14 +300,16 @@ class PlainTextView extends TextFileView {
 		if (this.editorView) {
 			closeSearchPanel(this.editorView);
 			const transaction = this.editorView.state.update({
-				changes: { from: 0, to: this.editorView.state.doc.length, insert: "" }
+				changes: { from: 0, to: this.editorView.state.doc.length, insert: "" },
 			});
 			this.editorView.dispatch(transaction);
 		}
 	}
 
 	updateToggleButtons(searchPanel: Element) {
-		let toggleBtn = searchPanel.querySelector(".plain-text-gutter-toggle") as HTMLButtonElement | null;
+		let toggleBtn = searchPanel.querySelector(
+			".plain-text-gutter-toggle",
+		) as HTMLButtonElement | null;
 		if (!toggleBtn) {
 			toggleBtn = document.createElement("button");
 			toggleBtn.className = "cm-button plain-text-gutter-toggle";
@@ -248,7 +321,9 @@ class PlainTextView extends TextFileView {
 		}
 		toggleBtn.classList.toggle("is-active", this.showLineNumbers);
 
-		let toggleWrapBtn = searchPanel.querySelector(".plain-text-wrap-toggle") as HTMLButtonElement | null;
+		let toggleWrapBtn = searchPanel.querySelector(
+			".plain-text-wrap-toggle",
+		) as HTMLButtonElement | null;
 		if (!toggleWrapBtn) {
 			toggleWrapBtn = document.createElement("button");
 			toggleWrapBtn.className = "cm-button plain-text-wrap-toggle";
@@ -264,9 +339,13 @@ class PlainTextView extends TextFileView {
 	toggleLineNumbers() {
 		this.showLineNumbers = !this.showLineNumbers;
 		this.editorView.dispatch({
-			effects: this.lineNumbersCompartment.reconfigure(this.showLineNumbers ? lineNumbers() : [])
+			effects: this.lineNumbersCompartment.reconfigure(
+				this.showLineNumbers ? lineNumbers() : [],
+			),
 		});
-		const searchPanel = this.editorView?.dom?.querySelector(".cm-panel-search, .cm-search");
+		const searchPanel = this.editorView?.dom?.querySelector(
+			".cm-panel-search, .cm-search",
+		);
 		if (searchPanel) {
 			this.updateToggleButtons(searchPanel);
 		}
@@ -275,9 +354,13 @@ class PlainTextView extends TextFileView {
 	toggleLineWrapping() {
 		this.showLineWrapping = !this.showLineWrapping;
 		this.editorView.dispatch({
-			effects: this.lineWrappingCompartment.reconfigure(this.showLineWrapping ? EditorView.lineWrapping : [])
+			effects: this.lineWrappingCompartment.reconfigure(
+				this.showLineWrapping ? EditorView.lineWrapping : [],
+			),
 		});
-		const searchPanel = this.editorView?.dom?.querySelector(".cm-panel-search, .cm-search");
+		const searchPanel = this.editorView?.dom?.querySelector(
+			".cm-panel-search, .cm-search",
+		);
 		if (searchPanel) {
 			this.updateToggleButtons(searchPanel);
 		}
@@ -287,7 +370,10 @@ class PlainTextView extends TextFileView {
 /* ── Live Preview Plugin ────────────────────────────────────── */
 
 class HtmlImagePluginValue implements PluginValue {
-	constructor(private view: EditorView, private plugin: ShowStuffsPlugin) {
+	constructor(
+		private view: EditorView,
+		private plugin: ShowStuffsPlugin,
+	) {
 		this.updateImages();
 	}
 
@@ -310,6 +396,7 @@ class HtmlImagePluginValue implements PluginValue {
 
 export default class ShowStuffsPlugin extends Plugin {
 	settings!: ShowStuffsSettings;
+	private mouseWheelZoomManager!: MouseWheelZoomManager;
 	private matcher!: ExclusionMatcher;
 	private previousShowUnsupportedFiles = false;
 	private originalReconcileDeletion:
@@ -322,12 +409,17 @@ export default class ShowStuffsPlugin extends Plugin {
 	async onload() {
 		await this.loadSettings();
 
-		this.registerView(
-			VIEW_TYPE_PLAIN_TEXT,
-			(leaf) => new PlainTextView(leaf)
+		this.mouseWheelZoomManager = new MouseWheelZoomManager(
+			this,
+			() => this.settings,
 		);
+		this.mouseWheelZoomManager.setup();
 
-		const plainTextExtensions = parseMultilineSetting(this.settings.plainTextExtensions);
+		this.registerView(VIEW_TYPE_PLAIN_TEXT, (leaf) => new PlainTextView(leaf));
+
+		const plainTextExtensions = parseMultilineSetting(
+			this.settings.plainTextExtensions,
+		);
 		if (plainTextExtensions.length > 0) {
 			this.registerExtensions(plainTextExtensions, VIEW_TYPE_PLAIN_TEXT);
 		}
@@ -344,17 +436,16 @@ export default class ShowStuffsPlugin extends Plugin {
 								await leaf.setViewState({
 									type: VIEW_TYPE_PLAIN_TEXT,
 									active: true,
-									state: { file: file.path }
+									state: { file: file.path },
 								});
 							});
 					});
 				}
-			})
+			}),
 		);
 
 		this.previousShowUnsupportedFiles =
-			(this.app.vault.getConfig("showUnsupportedFiles") as boolean) ??
-			false;
+			(this.app.vault.getConfig("showUnsupportedFiles") as boolean) ?? false;
 
 		if (this.settings.showAllFileTypes) {
 			this.applyShowAllFileTypes();
@@ -369,20 +460,120 @@ export default class ShowStuffsPlugin extends Plugin {
 			}
 		});
 
-		this.registerMarkdownPostProcessor((element: HTMLElement, context: MarkdownPostProcessorContext) => {
-			if (this.settings.renderHtmlImages) {
-				this.processHtmlImages(element, context.sourcePath);
-			}
-		});
+		this.registerMarkdownPostProcessor(
+			(element: HTMLElement, context: MarkdownPostProcessorContext) => {
+				if (this.settings.renderHtmlImages) {
+					this.processHtmlImages(element, context.sourcePath);
+				}
+			},
+		);
 
 		this.registerEditorExtension(
-			ViewPlugin.define((view) => new HtmlImagePluginValue(view, this))
+			ViewPlugin.define((view) => new HtmlImagePluginValue(view, this)),
 		);
+
+		// Image popup click handler
+		if (this.settings.popupClickModifier !== "disabled") {
+			const clickMod = this.settings.popupClickModifier;
+			this.registerDomEvent(
+				document,
+				"click",
+				(evt: MouseEvent) => {
+					const target = evt.target as Element;
+					if (!target || target.nodeName !== "IMG") return;
+
+					// Skip images in source editing mode
+					const activeView =
+						this.app.workspace.getActiveViewOfType(MarkdownView);
+					if (activeView && activeView.getMode() === "source") return;
+
+					// Check modifier condition
+					if (!isModifierPressed(evt, clickMod)) return;
+
+					evt.preventDefault();
+					evt.stopPropagation();
+
+					// Find the markdown leaf containing this image
+					const leaves = this.app.workspace.getLeavesOfType("markdown");
+					for (const leaf of leaves) {
+						if (
+							leaf.view instanceof MarkdownView &&
+							leaf.view.containerEl.contains(target)
+						) {
+							// Collect images from renderer sections (gives correct DOM order
+							// matching source text, avoids duplicates in split panes)
+							const preview = leaf.view.previewMode;
+							const sections = (preview as any)?.renderer?.sections as
+								| Array<{ el?: HTMLElement }>
+								| undefined;
+
+							const srcList: string[] = [];
+							let clickedIndex = -1;
+
+							if (Array.isArray(sections) && sections.length > 0) {
+								for (const section of sections) {
+									if (!section?.el) continue;
+									const sectionImgs = Array.from(
+										section.el.querySelectorAll<HTMLImageElement>("img"),
+									);
+									for (const img of sectionImgs) {
+										if (img === target) {
+											clickedIndex = srcList.length;
+										}
+										srcList.push(img.src);
+									}
+								}
+							}
+
+							// Fallback: direct container query if sections unavailable
+							if (srcList.length === 0) {
+								const imgs = Array.from(
+									leaf.view.containerEl.querySelectorAll<HTMLImageElement>(
+										"img",
+									),
+								);
+								clickedIndex = imgs.indexOf(target as HTMLImageElement);
+								for (const img of imgs) {
+									srcList.push(img.src);
+								}
+							}
+
+							if (clickedIndex === -1) return;
+
+							const imgSettings: PopupViewSettings = {
+								widthPercent: this.settings.popupWidthPercent,
+								maxWidth: this.settings.popupMaxWidth,
+								heightPercent: this.settings.popupHeightPercent,
+								maxHeight: this.settings.popupMaxHeight,
+								upscaleImage: this.settings.popupUpscaleImage,
+								borderOuterWidth: this.settings.borderOuterWidth,
+								borderMiddleWidth: this.settings.borderMiddleWidth,
+								borderInnerWidth: this.settings.borderInnerWidth,
+								borderOuterColor: this.settings.borderOuterColor,
+								borderMiddleColor: this.settings.borderMiddleColor,
+								bgOpacity: this.settings.popupBgOpacity,
+							};
+
+							const popup = new ImagePopup(
+								srcList,
+								clickedIndex,
+								imgSettings,
+								() => {},
+							);
+							popup.open();
+							break;
+						}
+					}
+				},
+				{ capture: true },
+			);
+		}
 
 		this.addSettingTab(new ShowStuffsSettingTab(this.app, this));
 	}
 
 	onunload() {
+		this.mouseWheelZoomManager?.onunload();
 		this.clearHiddenFilesRefreshTimer();
 		void this.restoreAdapter();
 		this.restoreDotfileWarning();
@@ -401,7 +592,11 @@ export default class ShowStuffsPlugin extends Plugin {
 	processHtmlImages(element: HTMLElement, sourcePath: string) {
 		const targetLinks = Array.from(element.getElementsByTagName("img"));
 		for (const link of targetLinks) {
-			if (!link.src || link.src.startsWith("http") || link.src.startsWith("data:")) {
+			if (
+				!link.src ||
+				link.src.startsWith("http") ||
+				link.src.startsWith("data:")
+			) {
 				continue;
 			}
 
@@ -410,7 +605,10 @@ export default class ShowStuffsPlugin extends Plugin {
 				.replace("app://obsidian.md/", "")
 				.replace("capacitor://localhost/", "");
 
-			const imageFile = this.app.metadataCache.getFirstLinkpathDest(decodeURIComponent(cleanLink), sourcePath);
+			const imageFile = this.app.metadataCache.getFirstLinkpathDest(
+				decodeURIComponent(cleanLink),
+				sourcePath,
+			);
 			if (imageFile instanceof TFile) {
 				const activePath = this.app.vault.getResourcePath(imageFile);
 				link.src = activePath;
@@ -421,7 +619,8 @@ export default class ShowStuffsPlugin extends Plugin {
 	/* ── settings persistence ──────────────────────────────── */
 
 	async loadSettings() {
-		const loaded = (await this.loadData()) as Partial<ShowStuffsSettings> | null;
+		const loaded =
+			(await this.loadData()) as Partial<ShowStuffsSettings> | null;
 
 		this.settings = Object.assign({}, DEFAULT_SETTINGS, loaded ?? {});
 
@@ -478,8 +677,7 @@ export default class ShowStuffsPlugin extends Plugin {
 		const adapter = this.adapter();
 
 		if (this.originalReconcileDeletion) return; // already patched
-		this.originalReconcileDeletion =
-			adapter.reconcileDeletion.bind(adapter);
+		this.originalReconcileDeletion = adapter.reconcileDeletion.bind(adapter);
 
 		const origReconcileDeletion = this.originalReconcileDeletion;
 
@@ -701,11 +899,13 @@ class ShowStuffsSettingTab extends PluginSettingTab {
 					'Synced with Obsidian\'s native "Detect all file extensions" setting.',
 			)
 			.addToggle((toggle) => {
-				toggle.setValue(this.plugin.settings.showAllFileTypes).onChange(async (value) => {
-					this.plugin.settings.showAllFileTypes = value;
-					await this.plugin.saveSettings();
-					this.plugin.applyShowAllFileTypes();
-				});
+				toggle
+					.setValue(this.plugin.settings.showAllFileTypes)
+					.onChange(async (value) => {
+						this.plugin.settings.showAllFileTypes = value;
+						await this.plugin.saveSettings();
+						this.plugin.applyShowAllFileTypes();
+					});
 			});
 
 		new Setting(containerEl)
@@ -733,9 +933,10 @@ class ShowStuffsSettingTab extends PluginSettingTab {
 				"Filter hidden files using glob patterns (e.g. **/node_modules/*, .git/**). One pattern per line. Names without separators match any path segment.",
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder(
-					`.git*\n.DS_Store\n${this.app.vault.configDir}\n**/node_modules/*`,
-				)
+				text
+					.setPlaceholder(
+						`.git*\n.DS_Store\n${this.app.vault.configDir}\n**/node_modules/*`,
+					)
 					.setValue(this.plugin.settings.ignoredHiddenGlobs)
 					.onChange(async (value) => {
 						this.plugin.settings.ignoredHiddenGlobs = value;
@@ -753,7 +954,8 @@ class ShowStuffsSettingTab extends PluginSettingTab {
 					"Comma- or newline-separated. Requires disabling and re-enabling this plugin to apply changes.",
 			)
 			.addTextArea((text) => {
-				text.setPlaceholder("txt, log, conf")
+				text
+					.setPlaceholder("txt, log, conf")
 					.setValue(this.plugin.settings.plainTextExtensions)
 					.onChange(async (value) => {
 						this.plugin.settings.plainTextExtensions = value;
@@ -777,7 +979,241 @@ class ShowStuffsSettingTab extends PluginSettingTab {
 						await this.plugin.saveSettings();
 						// Refresh active view if possible
 						this.app.workspace.requestSaveLayout();
-					})
+					}),
+			);
+
+		containerEl.createEl("h3", { text: "Image zoom" });
+
+		new Setting(containerEl)
+			.setName("Zoom modifier")
+			.setDesc(
+				"Modifier key to hold while scrolling over an image to resize and persist the change. Set to Disabled to skip registering the scroll listener.",
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("disabled", "Disabled")
+					.addOption(ModifierKey.CTRL, "Ctrl")
+					.addOption(ModifierKey.ALT, "Alt")
+					.addOption(ModifierKey.SHIFT, "Shift")
+					.addOption(ModifierKey.CTRL_RIGHT, "Right ctrl")
+					.addOption(ModifierKey.ALT_RIGHT, "Right alt")
+					.addOption(ModifierKey.SHIFT_RIGHT, "Right shift")
+					.setValue(this.plugin.settings.persistentZoomModifier)
+					.onChange(async (value) => {
+						this.plugin.settings.persistentZoomModifier = value as
+							| ModifierKey
+							| "disabled";
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Zoom step size")
+			.setDesc(
+				"Step value by which the size of the image should be increased or decreased.",
+			)
+			.addSlider((slider) => {
+				slider
+					.setLimits(0, 30, 1)
+					.setDynamicTooltip()
+					.setValue(this.plugin.settings.mouseWheelZoomStepSize)
+					.onChange(async (value) => {
+						this.plugin.settings.mouseWheelZoomStepSize = value;
+						await this.plugin.saveSettings();
+					});
+			});
+
+		containerEl.createEl("h3", { text: "Image popup" });
+
+		new Setting(containerEl)
+			.setName("Popup click modifier")
+			.setDesc(
+				"Modifier key to hold while clicking an image to open it in a popup viewer. 'None' means clicking without any modifier opens the popup. 'Disabled' means the click listener is not registered.",
+			)
+			.addDropdown((dropdown) =>
+				dropdown
+					.addOption("disabled", "Disabled")
+					.addOption("none", "None")
+					.addOption(ModifierKey.CTRL, "Ctrl")
+					.addOption(ModifierKey.ALT, "Alt")
+					.addOption(ModifierKey.SHIFT, "Shift")
+					.addOption(ModifierKey.CTRL_RIGHT, "Right ctrl")
+					.addOption(ModifierKey.ALT_RIGHT, "Right alt")
+					.addOption(ModifierKey.SHIFT_RIGHT, "Right shift")
+					.setValue(this.plugin.settings.popupClickModifier)
+					.onChange(async (value) => {
+						this.plugin.settings.popupClickModifier = value as
+							| ModifierKey
+							| "none"
+							| "disabled";
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Display width")
+			.setDesc("Display area width as a percentage of the viewport.")
+			.addSlider((slider) =>
+				slider
+					.setLimits(10, 100, 5)
+					.setDynamicTooltip()
+					.setValue(this.plugin.settings.popupWidthPercent)
+					.onChange(async (value) => {
+						this.plugin.settings.popupWidthPercent = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Max width")
+			.setDesc("Maximum display area width in pixels. 0 means uncapped.")
+			.addText((text) =>
+				text
+					.setPlaceholder("0")
+					.setValue(String(this.plugin.settings.popupMaxWidth))
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num >= 0) {
+							this.plugin.settings.popupMaxWidth = num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Display height")
+			.setDesc("Display area height as a percentage of the viewport.")
+			.addSlider((slider) =>
+				slider
+					.setLimits(10, 100, 5)
+					.setDynamicTooltip()
+					.setValue(this.plugin.settings.popupHeightPercent)
+					.onChange(async (value) => {
+						this.plugin.settings.popupHeightPercent = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Max height")
+			.setDesc("Maximum display area height in pixels. 0 means uncapped.")
+			.addText((text) =>
+				text
+					.setPlaceholder("0")
+					.setValue(String(this.plugin.settings.popupMaxHeight))
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num >= 0) {
+							this.plugin.settings.popupMaxHeight = num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Upscale image")
+			.setDesc(
+				"If enabled, images smaller than the display area are scaled up until they hit the display area limit.",
+			)
+			.addToggle((toggle) =>
+				toggle
+					.setValue(this.plugin.settings.popupUpscaleImage)
+					.onChange(async (value) => {
+						this.plugin.settings.popupUpscaleImage = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Outer border width")
+			.setDesc("Width of the outer border layer in pixels.")
+			.addText((text) =>
+				text
+					.setPlaceholder("2")
+					.setValue(String(this.plugin.settings.borderOuterWidth))
+					.onChange(async (value) => {
+						const num = parseFloat(value);
+						if (!isNaN(num) && num >= 0) {
+							this.plugin.settings.borderOuterWidth = num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Border width")
+			.setDesc("Width of the middle border layer in pixels. 0 to disable.")
+			.addText((text) =>
+				text
+					.setPlaceholder("3")
+					.setValue(String(this.plugin.settings.borderMiddleWidth))
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num >= 0) {
+							this.plugin.settings.borderMiddleWidth = num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Inner border width")
+			.setDesc("Width of the inner border layer in pixels.")
+			.addText((text) =>
+				text
+					.setPlaceholder("3")
+					.setValue(String(this.plugin.settings.borderInnerWidth))
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num >= 0) {
+							this.plugin.settings.borderInnerWidth = num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Outer border color")
+			.setDesc(
+				"Hex color for the outer border layer (dark gray, lighter than black).",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("#10082D")
+					.setValue(this.plugin.settings.borderOuterColor)
+					.onChange(async (value) => {
+						this.plugin.settings.borderOuterColor = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Border color")
+			.setDesc(
+				"Hex color for the middle border layer. Replaces the white border.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder("#BFBAB5")
+					.setValue(this.plugin.settings.borderMiddleColor)
+					.onChange(async (value) => {
+						this.plugin.settings.borderMiddleColor = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Background opacity")
+			.setDesc("Opacity of the dimmed background behind the popup image.")
+			.addSlider((slider) =>
+				slider
+					.setLimits(0, 100, 5)
+					.setDynamicTooltip()
+					.setValue(this.plugin.settings.popupBgOpacity)
+					.onChange(async (value) => {
+						this.plugin.settings.popupBgOpacity = value;
+						await this.plugin.saveSettings();
+					}),
 			);
 	}
 }
