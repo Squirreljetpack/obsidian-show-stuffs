@@ -39,6 +39,9 @@ export class ImagePopup {
 	private panX = 0;
 	private panY = 0;
 
+	/* track retries to prevent infinite error recursion */
+	private errorRetryCount = 0;
+
 	/* drag state */
 	private isDragging = false;
 	private dragStartX = 0;
@@ -86,10 +89,17 @@ export class ImagePopup {
 	/* ── public API ────────────────────────────────── */
 
 	open() {
+		// Validate images before proceeding
+		const src = this.images[this.currentIndex];
+		if (!src) {
+			this.overlayEl.remove();
+			this.onCloseCb();
+			return;
+		}
 		document.body.appendChild(this.overlayEl);
 		this.computeDisplayArea();
-		this.loadCurrentImage();
 		this.listen(true);
+		this.loadCurrentImage();
 	}
 
 	close() {
@@ -129,7 +139,6 @@ export class ImagePopup {
 		this.imgEl.className = "show-stuffs-popup-img";
 		Object.assign(this.imgEl.style, {
 			display: "block",
-			transformOrigin: "0 0",
 			pointerEvents: "none",
 		});
 
@@ -144,6 +153,7 @@ export class ImagePopup {
 			pointer-events: auto;
 			cursor: grab;
 			user-select: none;
+			transform-origin: 0 0;
 		`;
 
 		const hasOuterBlack = this.settings.borderOuterWidth > 0;
@@ -275,12 +285,17 @@ export class ImagePopup {
 
 	private loadCurrentImage() {
 		const src = this.images[this.currentIndex];
-		if (!src) return this.close();
+		if (!src) {
+			// All images were tried and none loaded
+			this.close();
+			return;
+		}
 
 		// Reset zoom/pan for new image
 		this.scale = 1;
 		this.panX = 0;
 		this.panY = 0;
+		this.errorRetryCount = 0;
 
 		const tempImg = new window.Image();
 		tempImg.onload = () => {
@@ -307,6 +322,12 @@ export class ImagePopup {
 			this.updateNavHint();
 		};
 		tempImg.onerror = () => {
+			this.errorRetryCount++;
+			// Limit retries to prevent infinite loop if all images fail
+			if (this.errorRetryCount >= this.images.length) {
+				this.close();
+				return;
+			}
 			// On error, try next image
 			this.navigateTo(1);
 		};
@@ -333,7 +354,7 @@ export class ImagePopup {
 	/* ── transform (zoom & pan) ────────────────────── */
 
 	private applyTransform() {
-		this.imgEl.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
+		this.wrapperEl.style.transform = `translate(${this.panX}px, ${this.panY}px) scale(${this.scale})`;
 	}
 
 	/* ── event handlers ────────────────────────────── */
@@ -355,7 +376,7 @@ export class ImagePopup {
 	private onWheel(e: WheelEvent) {
 		e.preventDefault();
 
-		const rect = this.imgEl.getBoundingClientRect();
+		const rect = this.wrapperEl.getBoundingClientRect();
 		const cursorX = e.clientX - rect.left;
 		const cursorY = e.clientY - rect.top;
 
