@@ -1,6 +1,6 @@
 {
   "name": "obsidian-show-stuffs",
-  "version": "1.7.0",
+  "version": "1.8.0",
   "description": "Obsidian plugin to show hidden dotfiles, all file types, and render local HTML images.",
   "main": "main.js",
   "type": "module",
