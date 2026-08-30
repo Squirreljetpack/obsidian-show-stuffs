@@ -10,7 +10,9 @@ import {
 	TextFileView,
 	WorkspaceLeaf,
 	MarkdownView,
+	Editor,
 } from "obsidian";
+import { downloadAndEmbedClipboardImage } from "./utils/clipboard-image.js";
 import {
 	EditorView,
 	ViewUpdate,
@@ -141,6 +143,9 @@ interface ShowStuffsSettings {
 	borderOuterColor: string;
 	borderMiddleColor: string;
 	popupBgOpacity: number;
+	imageDownloadFolder: string;
+	imageDownloadMaxWidth: number;
+	imageDownloadMaxHeight: number;
 }
 
 const DEFAULT_SETTINGS: ShowStuffsSettings = {
@@ -163,6 +168,9 @@ const DEFAULT_SETTINGS: ShowStuffsSettings = {
 	borderOuterColor: "#10082D",
 	borderMiddleColor: "#BFBAB5",
 	popupBgOpacity: 50,
+	imageDownloadFolder: ".${noteFileName}.assets/",
+	imageDownloadMaxWidth: 0,
+	imageDownloadMaxHeight: 0,
 };
 
 export const VIEW_TYPE_PLAIN_TEXT = "plain-text-view";
@@ -569,6 +577,14 @@ export default class ShowStuffsPlugin extends Plugin {
 			);
 		}
 
+		this.addCommand({
+			id: "download-image-from-clipboard",
+			name: "Download and embed image from clipboard",
+			editorCallback: async (editor: Editor, view: MarkdownView) => {
+				await this.downloadAndEmbedImageFromClipboard(editor, view);
+			},
+		});
+
 		this.addSettingTab(new ShowStuffsSettingTab(this.app, this));
 	}
 
@@ -875,6 +891,20 @@ export default class ShowStuffsPlugin extends Plugin {
 			}
 			this.originalI18nT = null;
 		}
+	}
+
+	/* ── download image from clipboard ─────────────────────── */
+
+	async downloadAndEmbedImageFromClipboard(
+		editor: Editor,
+		view: MarkdownView,
+	): Promise<void> {
+		await downloadAndEmbedClipboardImage(
+			this.app,
+			editor,
+			view,
+			this.settings,
+		);
 	}
 }
 
@@ -1213,6 +1243,55 @@ class ShowStuffsSettingTab extends PluginSettingTab {
 					.onChange(async (value) => {
 						this.plugin.settings.popupBgOpacity = value;
 						await this.plugin.saveSettings();
+					}),
+			);
+
+		containerEl.createEl("h3", { text: "Image download" });
+
+		new Setting(containerEl)
+			.setName("Image download folder")
+			.setDesc(
+				"Folder where images downloaded from clipboard URLs will be saved. " +
+					"Starting with ./ or . means relative to the parent folder of the note. " +
+					"Use ${noteFileName} for the active note's filename.",
+			)
+			.addText((text) =>
+				text
+					.setPlaceholder(".${noteFileName}.assets/")
+					.setValue(this.plugin.settings.imageDownloadFolder)
+					.onChange(async (value) => {
+						this.plugin.settings.imageDownloadFolder = value;
+						await this.plugin.saveSettings();
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Max image width")
+			.addText((text) =>
+				text
+					.setPlaceholder("0")
+					.setValue(String(this.plugin.settings.imageDownloadMaxWidth))
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num >= 0) {
+							this.plugin.settings.imageDownloadMaxWidth = num;
+							await this.plugin.saveSettings();
+						}
+					}),
+			);
+
+		new Setting(containerEl)
+			.setName("Max image height")
+			.addText((text) =>
+				text
+					.setPlaceholder("0")
+					.setValue(String(this.plugin.settings.imageDownloadMaxHeight))
+					.onChange(async (value) => {
+						const num = parseInt(value, 10);
+						if (!isNaN(num) && num >= 0) {
+							this.plugin.settings.imageDownloadMaxHeight = num;
+							await this.plugin.saveSettings();
+						}
 					}),
 			);
 	}

@@ -11,6 +11,7 @@ Reveals hidden dotfiles (`.claude/`, `.gitignore`, `.env`, `.github/`, etc.), al
 - **Open as plain text** — Right click to open plain text files directly in Obsidian.
 - **Mousewheel image zoom** — Resize images dynamically by scrolling over them while holding a modifier key. Set the modifier to "Disabled" to skip the scroll listener.
 - **Image popup** — Click an image to open it in a fullscreen popup with a dimmed background. Navigate between images with left/right arrow keys. Scroll to zoom at cursor, click-drag to pan. Includes display area sizing, upscale control, background opacity, and configurable borders.
+- **Download and embed image from clipboard** — Command that reads an image URL from clipboard, downloads it, saves it to a configurable assets folder (relative to the note with `${noteFileName}` templating), and embeds it into the active note.
 
 > **Note:** Enabling this plugin exposes sensitive dotfiles (`.env`, `.git-credentials`, etc.) in the Obsidian file explorer, making them viewable, editable, and deletable. Make sure you understand what these files are before modifying them.
 
@@ -53,6 +54,9 @@ Squirreljetpack/obsidian-show-stuffs
 | Border color | `#BFBAB5` | Hex color for the middle border layer. Replaces the white border. |
 | Background opacity | 50% | Opacity of the dimmed background behind the popup image. |
 | Zoom step size | 10 | Step value by which the size of the image should be increased or decreased. |
+| Image download folder | `.${noteFileName}.assets/` | Target folder for images downloaded from clipboard URLs. Relative to parent folder when starting with `./` or `.`. Supports `${noteFileName}`. |
+| Max image width | 0 | Maximum width in pixels for downloaded images (0 for unbounded). Images exceeding this are resized while preserving aspect ratio. |
+| Max image height | 0 | Maximum height in pixels for downloaded images (0 for unbounded). Images exceeding this are resized while preserving aspect ratio. |
 
 Examples for **Ignored hidden globs**:
 
