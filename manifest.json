@@ -1,7 +1,7 @@
 {
 	"id": "show-stuffs",
 	"name": "Show Stuffs",
-	"version": "1.8.0",
+	"version": "1.9.0",
 	"minAppVersion": "0.15.0",
 	"description": "Reveals hidden dotfiles, all file types, and renders local HTML images.",
 	"author": "Squirreljetpack",
