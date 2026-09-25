@@ -8,6 +8,12 @@ import { ModifierKey } from "./utils/image-zoom-util.js";
  * lets the user navigate between them with left/right arrows.
  */
 
+export interface PopupImageItem {
+	src: string;
+	element?: HTMLElement;
+	line?: number;
+}
+
 export interface PopupViewSettings {
 	widthPercent: number;
 	maxWidth: number;
@@ -29,10 +35,11 @@ export class ImagePopup {
 	private imgEl: HTMLImageElement;
 	private navHintEl: HTMLElement;
 
-	private images: string[];
+	private images: PopupImageItem[];
 	private currentIndex: number;
 	private settings: PopupViewSettings;
 	private onCloseCb: () => void;
+	private onNavigateCb?: (index: number, item: PopupImageItem) => void;
 
 	/* zoom / pan state */
 	private scale = 1;
@@ -66,15 +73,19 @@ export class ImagePopup {
 	private boundBgClick: (e: MouseEvent) => void;
 
 	constructor(
-		images: string[],
+		images: (string | PopupImageItem)[],
 		startIndex: number,
 		settings: PopupViewSettings,
 		onClose: () => void,
+		onNavigate?: (index: number, item: PopupImageItem) => void,
 	) {
-		this.images = images;
-		this.currentIndex = Math.max(0, Math.min(startIndex, images.length - 1));
+		this.images = images.map((item) =>
+			typeof item === "string" ? { src: item } : item,
+		);
+		this.currentIndex = Math.max(0, Math.min(startIndex, this.images.length - 1));
 		this.settings = settings;
 		this.onCloseCb = onClose;
+		this.onNavigateCb = onNavigate;
 
 		this.boundKeyDown = this.onKeyDown.bind(this);
 		this.boundWheel = this.onWheel.bind(this);
@@ -90,8 +101,8 @@ export class ImagePopup {
 
 	open() {
 		// Validate images before proceeding
-		const src = this.images[this.currentIndex];
-		if (!src) {
+		const currentItem = this.images[this.currentIndex];
+		if (!currentItem || !currentItem.src) {
 			this.overlayEl.remove();
 			this.onCloseCb();
 			return;
@@ -283,13 +294,27 @@ export class ImagePopup {
 
 	/* ── image loading & navigation ────────────────── */
 
+	private scrollToImage(item: PopupImageItem) {
+		if (item.element && item.element.isConnected) {
+			item.element.scrollIntoView({
+				behavior: "smooth",
+				block: "center",
+			});
+		}
+	}
+
 	private loadCurrentImage() {
-		const src = this.images[this.currentIndex];
+		const currentItem = this.images[this.currentIndex];
+		const src = currentItem?.src;
 		if (!src) {
 			// All images were tried and none loaded
 			this.close();
 			return;
 		}
+
+		// Scroll the active note to where the current image is
+		this.scrollToImage(currentItem);
+		this.onNavigateCb?.(this.currentIndex, currentItem);
 
 		// Reset zoom/pan for new image
 		this.scale = 1;
@@ -370,6 +395,9 @@ export class ImagePopup {
 		} else if (e.key === "ArrowRight") {
 			e.preventDefault();
 			this.navigateTo(1);
+		} else if (e.key === " " || e.code === "Space") {
+			e.preventDefault();
+			this.navigateTo(e.shiftKey ? -1 : 1);
 		}
 	}
 
@@ -384,8 +412,9 @@ export class ImagePopup {
 		const newScale = Math.max(0.1, this.scale * (1 + delta));
 
 		// Adjust pan so cursor position stays fixed on the image
-		this.panX = cursorX - (cursorX - this.panX) * (newScale / this.scale);
-		this.panY = cursorY - (cursorY - this.panY) * (newScale / this.scale);
+		const ratio = newScale / this.scale;
+		this.panX -= cursorX * (ratio - 1);
+		this.panY -= cursorY * (ratio - 1);
 
 		this.scale = newScale;
 		this.applyTransform();

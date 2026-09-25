@@ -27,6 +27,7 @@ import { MouseWheelZoomManager } from "./utils/mousewheel-zoom.js";
 import { ModifierKey } from "./utils/image-zoom-util.js";
 import {
 	ImagePopup,
+	PopupImageItem,
 	PopupViewSettings,
 	isModifierPressed,
 } from "./image-popup.js";
@@ -512,29 +513,38 @@ export default class ShowStuffsPlugin extends Plugin {
 							// matching source text, avoids duplicates in split panes)
 							const preview = leaf.view.previewMode;
 							const sections = (preview as any)?.renderer?.sections as
-								| Array<{ el?: HTMLElement }>
+								| Array<{
+										el?: HTMLElement;
+										lineStart?: number;
+										start?: { line?: number };
+										line?: number;
+								  }>
 								| undefined;
 
-							const srcList: string[] = [];
+							const items: PopupImageItem[] = [];
 							let clickedIndex = -1;
 
 							if (Array.isArray(sections) && sections.length > 0) {
 								for (const section of sections) {
 									if (!section?.el) continue;
+									const line =
+										section.lineStart ??
+										section.start?.line ??
+										section.line;
 									const sectionImgs = Array.from(
 										section.el.querySelectorAll<HTMLImageElement>("img"),
 									);
 									for (const img of sectionImgs) {
 										if (img === target) {
-											clickedIndex = srcList.length;
+											clickedIndex = items.length;
 										}
-										srcList.push(img.src);
+										items.push({ src: img.src, element: img, line });
 									}
 								}
 							}
 
 							// Fallback: direct container query if sections unavailable
-							if (srcList.length === 0) {
+							if (items.length === 0) {
 								const imgs = Array.from(
 									leaf.view.containerEl.querySelectorAll<HTMLImageElement>(
 										"img",
@@ -542,7 +552,7 @@ export default class ShowStuffsPlugin extends Plugin {
 								);
 								clickedIndex = imgs.indexOf(target as HTMLImageElement);
 								for (const img of imgs) {
-									srcList.push(img.src);
+									items.push({ src: img.src, element: img });
 								}
 							}
 
@@ -563,10 +573,21 @@ export default class ShowStuffsPlugin extends Plugin {
 							};
 
 							const popup = new ImagePopup(
-								srcList,
+								items,
 								clickedIndex,
 								imgSettings,
 								() => {},
+								(_index, item) => {
+									if (typeof item.line === "number") {
+										preview?.applyScroll(item.line);
+									}
+									if (item.element) {
+										item.element.scrollIntoView({
+											behavior: "smooth",
+											block: "center",
+										});
+									}
+								},
 							);
 							popup.open();
 							break;
